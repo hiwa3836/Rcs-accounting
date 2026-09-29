@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RCS 会計フォーム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#2A2118;
+    --ink-soft:#6B5D4F;
+    --paper:#F7F3EC;
+    --panel:#FFFFFF;
+    --line:#E4DACB;
+    --roast:#5C4033;
+    --roast-deep:#3B281E;
+    --moss:#6E7B5E;
+    --err:#B3402A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Noto Sans KR","Noto Sans JP",sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:28px 20px 80px;}
+  header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:22px;}
+  header h1{font-size:20px; font-weight:700; margin:0; letter-spacing:-0.2px;}
+  header .mark{font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink-soft); border:1px solid var(--line); padding:3px 8px; border-radius:20px;}
+  nav.tabs{display:flex; gap:6px; margin-bottom:20px; border-bottom:1px solid var(--line);}
+  nav.tabs button{
+    flex:1; padding:11px 0; background:none; border:none; cursor:pointer;
+    font-size:14px; font-weight:500; color:var(--ink-soft);
+    border-bottom:2px solid transparent; margin-bottom:-1px;
+    font-family:inherit;
+  }
+  nav.tabs button.active{color:var(--roast-deep); border-bottom-color:var(--roast);}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:14px;}
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  label{display:block; font-size:13px; font-weight:500; color:var(--ink-soft); margin-bottom:6px;}
+  input, select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:15px; font-family:inherit; background:#FCFAF6; color:var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--roast); outline-offset:1px; border-color:var(--roast);}
+  .pin-row{display:flex; gap:8px;}
+  .pin-row input{letter-spacing:4px; text-align:center; font-family:"JetBrains Mono",monospace;}
+  button.primary{
+    width:100%; padding:12px; background:var(--roast-deep); color:#F7F3EC; border:none;
+    border-radius:8px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit;
+  }
+  button.primary:hover{background:var(--roast);}
+  button.primary:disabled{opacity:.5; cursor:default;}
+  button.ghost{
+    background:none; border:1px solid var(--line); color:var(--ink); padding:8px 14px;
+    border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  .who{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--ink-soft); margin-bottom:14px;}
+  .who b{color:var(--ink); font-weight:700;}
+  .msg{font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:14px;}
+  .msg.err{background:#FBEAE5; color:var(--err);}
+  .msg.ok{background:#EEF1E8; color:var(--moss);}
+  .hidden{display:none !important;}
+  .cat-other{margin-top:10px;}
+  .file-hint{font-size:12px; color:var(--ink-soft); margin-top:6px;}
+  .thumb{width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line);}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th, td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  th{color:var(--ink-soft); font-weight:500; font-size:12px;}
+  .filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters select, .filters input{width:auto; flex:1; min-width:100px;}
+  .filters + .filters{margin-top:-4px;}
+  .list-item{display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:8px;}
+  .list-item .info{flex:1; min-width:0;}
+  .list-item .info .top{font-size:13px; font-weight:500;}
+  .list-item .info .sub{font-size:12px; color:var(--ink-soft);}
+  .amount{font-family:"JetBrains Mono",monospace; font-weight:500;}
+  .row2{display:flex; gap:10px;}
+  .row2 > *{flex:1;}
+  .manage-list{list-style:none; padding:0; margin:0;}
+  .manage-list li{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  .manage-list li:last-child{border-bottom:none;}
+  .del{color:var(--err); background:none; border:none; cursor:pointer; font-size:12px; font-family:inherit;}
+  .section-title{font-size:14px; font-weight:700; margin:0 0 12px;}
+  .muted{color:var(--ink-soft); font-size:13px;}
+  .add-row{display:flex; gap:8px; margin-top:10px;}
+  .add-row input{flex:1;}
+  .add-row button{white-space:nowrap;}
+  .csv-btn{margin-top:10px;}
+  .check-label{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); font-weight:400; cursor:pointer;}
+  .modal{position:fixed; inset:0; background:rgba(42,33,24,.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:20;}
+  .modal-box{max-width:420px; width:100%; margin:0;}
+  .badge{font-size:11px; padding:2px 8px; border-radius:20px; font-weight:500;}
+  .badge.pending{background:#F3E9D8; color:#8A6A2A;}
+  .badge.checked{background:#EAF0E4; color:var(--moss);}
+  .badge.done{background:#E7E2FA; color:#5B4E9E;}
+  .status-select{width:auto; font-size:12px; padding:4px 8px;}
+  .manage-list li .btns{display:flex; gap:6px; align-items:center;}
+  .manage-list li .btns .ghost{padding:4px 10px; font-size:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>RCS 会計フォーム</h1>
+    <span class="mark">立命館珈琲研究会</span>
+  </header>
+
+  <nav class="tabs">
+    <button id="tabSubmitBtn" class="active" onclick="switchTab('submit')">제출</button>
+    <button id="tabAdminBtn" onclick="switchTab('admin')">관리자</button>
+  </nav>
+
+  <!-- ===================== 제출 탭 ===================== -->
+  <div id="tabSubmit">
+
+    <div id="loginCard" class="card">
+      <div class="field">
+        <label>이름</label>
+        <select id="loginName"><option value="">불러오는 중...</option></select>
+      </div>
+      <div class="field">
+        <label>개인 식별번호 (PIN)</label>
+        <div class="pin-row">
+          <input id="loginPin" type="password" inputmode="numeric" maxlength="8" placeholder="●●●●">
+        </div>
+      </div>
+      <div id="loginMsg"></div>
+      <button class="primary" onclick="doLogin()">확인</button>
+    </div>
+
+    <div id="formCard" class="card hidden">
+      <div class="who">
+        <span><b id="whoName"></b>님으로 제출</span>
+        <button class="ghost" onclick="logout()">다른 사람으로 전환</button>
+      </div>
+
+      <div class="field">
+        <label>領収書の日付 *</label>
+        <input id="fDate" type="date">
+      </div>
+      <div class="field">
+        <label>金額（数字のみ） *</label>
+        <input id="fAmount" type="number" inputmode="numeric" placeholder="예: 3500">
+      </div>
+      <div class="field">
+        <label>購入内容 *</label>
+        <textarea id="fDesc" rows="2" placeholder="예: 드립 필터 200매"></textarea>
+      </div>
+      <div class="field">
+        <label>区分（何用か） *</label>
+        <select id="fCategory"><option value="">불러오는 중...</option></select>
+        <div id="fCategoryOtherWrap" class="cat-other hidden">
+          <input id="fCategoryOther" placeholder="직접 입력">
+        </div>
+      </div>
+      <div class="field">
+        <label>영수증 사진 (사인 완료 후 촬영) *</label>
+        <input id="fReceipt" type="file" accept="image/*" capture="environment">
+        <div class="file-hint">실물 영수증은 서명 후 서클 창고함에도 함께 보관해주세요.</div>
+      </div>
+      <div class="field checkbox-field">
+        <label class="check-label">
+          <input type="checkbox" id="fAttest" style="width:auto;">
+          금액과 서명이 선명하게 보이는 사진입니다
+        </label>
+      </div>
+
+      <div id="submitMsg"></div>
+      <button class="primary" id="submitBtn" onclick="submitReceipt()">제출</button>
+    </div>
+
+    <div id="myListCard" class="card hidden">
+      <p class="section-title">내 제출 내역</p>
+      <div id="myList"></div>
+    </div>
+
+    <div id="editModal" class="modal hidden">
+      <div class="modal-box card">
+        <p class="section-title">내역 수정</p>
+        <div class="field"><label>날짜</label><input id="eDate" type="date"></div>
+        <div class="field"><label>금액</label><input id="eAmount" type="number"></div>
+        <div class="field"><label>구매내용</label><textarea id="eDesc" rows="2"></textarea></div>
+        <div class="field"><label>구분</label><input id="eCategory"></div>
+        <div id="editMsg"></div>
+        <div class="row2">
+          <button class="ghost" onclick="closeEdit()">취소</button>
+          <button class="primary" onclick="saveEdit()">저장</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== 관리자 탭 ===================== -->
+  <div id="tabAdmin" class="hidden">
+
+    <div id="adminLoginCard" class="card">
+      <div class="field">
+        <label>관리자 비밀번호</label>
+        <input id="adminPin" type="password" placeholder="총무/회장용 비밀번호">
+      </div>
+      <div id="adminLoginMsg"></div>
+      <button class="primary" onclick="adminLogin()">입장</button>
+    </div>
+
+    <div id="adminBody" class="hidden">
+
+      <div class="card">
+        <p class="section-title">제출 내역</p>
+        <div class="filters">
+          <select id="filterName"><option value="">전체 이름</option></select>
+          <select id="filterCategory"><option value="">전체 구분</option></select>
+        </div>
+        <div class="filters">
+          <input type="date" id="filterFrom" onchange="renderReceiptList()">
+          <span class="muted" style="align-self:center;">~</span>
+          <input type="date" id="filterTo" onchange="renderReceiptList()">
+          <button class="ghost" onclick="clearDateFilter()">기간 초기화</button>
+        </div>
+        <div id="receiptList"></div>
+        <button class="ghost csv-btn" onclick="exportCsv()">CSV로 내보내기</button>
+      </div>
+
+      <div class="card">
+        <p class="section-title">회원 관리 (이름 · PIN)</p>
+        <ul class="manage-list" id="memberList"></ul>
+        <div class="add-row">
+          <input id="newMemberName" placeholder="이름">
+          <input id="newMemberPin" placeholder="PIN" style="max-width:90px">
+          <button class="ghost" onclick="addMember()">추가</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="section-title">구분(카테고리) 관리</p>
+        <ul class="manage-list" id="categoryList"></ul>
+        <div class="add-row">
+          <input id="newCategoryName" placeholder="예: 이벤트, 통상활동">
+          <button class="ghost" onclick="addCategory()">추가</button>
+        </div>
+        <p class="muted" style="margin-top:8px;">"기타"는 자동으로 항상 마지막에 표시되며 삭제할 수 없습니다.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   설정 — 배포 전 아래 두 값만 본인의 Supabase 프로젝트 값으로 교체하세요.
+   관리자 비밀번호도 원하는 값으로 바꿔두세요.
+   ============================================================ */
+const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
+const ADMIN_PASSWORD = "rcs-admin"; // 총무/회장만 공유
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentMember = null;
+let members = [];
+let categories = [];
+
+// ---------- 초기화 ----------
+window.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("fDate").valueAsDate = new Date();
+  await loadMembers();
+  await loadCategories();
+});
+
+async function loadMembers() {
+  const { data, error } = await sb.from("members").select("*").eq("active", true).order("name");
+  members = error ? [] : data;
+  const sel = document.getElementById("loginName");
+  sel.innerHTML = members.length
+    ? members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join("")
+    : `<option value="">회원이 없습니다 (관리자 탭에서 추가)</option>`;
+}
+
+async function loadCategories() {
+  const { data, error } = await sb.from("categories").select("*").eq("active", true).order("name");
+  categories = error ? [] : data;
+  const sel = document.getElementById("fCategory");
+  const opts = categories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("");
+  sel.innerHTML = `<option value="">선택하세요</option>${opts}<option value="__other__">기타</option>`;
+  sel.onchange = () => {
+    document.getElementById("fCategoryOtherWrap").classList.toggle("hidden", sel.value !== "__other__");
+  };
+}
+
+function switchTab(tab) {
+  document.getElementById("tabSubmit").classList.toggle("hidden", tab !== "submit");
+  document.getElementById("tabAdmin").classList.toggle("hidden", tab !== "admin");
+  document.getElementById("tabSubmitBtn").classList.toggle("active", tab === "submit");
+  document.getElementById("tabAdminBtn").classList.toggle("active", tab === "admin");
+}
+
+// ---------- 회원 로그인(PIN) ----------
+async function doLogin() {
+  const id = document.getElementById("loginName").value;
+  const pin = document.getElementById("loginPin").value.trim();
+  const msg = document.getElementById("loginMsg");
+  if (!id || !pin) { msg.innerHTML = `<div class="msg err">이름과 PIN을 입력하세요.</div>`; return; }
+  const member = members.find(m => m.id === id);
+  if (!member || member.pin !== pin) {
+    msg.innerHTML = `<div class="msg err">PIN이 일치하지 않습니다.</div>`;
+    return;
+  }
+  msg.innerHTML = "";
+  currentMember = member;
+  document.getElementById("whoName").textContent = member.name;
+  document.getElementById("loginCard").classList.add("hidden");
+  document.getElementById("formCard").classList.remove("hidden");
+  document.getElementById("myListCard").classList.remove("hidden");
+  await loadMyReceipts();
+}
+
+function logout() {
+  currentMember = null;
+  document.getElementById("loginPin").value = "";
+  document.getElementById("formCard").classList.add("hidden");
+  document.getElementById("myListCard").classList.add("hidden");
+  document.getElementById("loginCard").classList.remove("hidden");
+}
+
+// ---------- 내 제출 내역 (본인 수정/삭제) ----------
+async function loadMyReceipts() {
+  const { data } = await sb.from("receipts").select("*").eq("member_id", currentMember.id).order("receipt_date", { ascending: false });
+  const list = document.getElementById("myList");
+  if (!data || !data.length) { list.innerHTML = `<p class="muted">아직 제출한 내역이 없습니다.</p>`; return; }
+  list.innerHTML = data.map(r => {
+    const locked = r.status === "정산완료";
+    const badgeClass = r.status === "정산완료" ? "done" : r.status === "확인됨" ? "checked" : "pending";
+    return `
+    <div class="list-item">
+      <img class="thumb" src="${r.image_url}" alt="영수증">
+      <div class="info">
+        <div class="top">${escapeHtml(r.description)} <span class="amount">¥${Number(r.amount).toLocaleString()}</span> <span class="badge ${badgeClass}">${r.status}</span></div>
+        <div class="sub">${r.receipt_date} · ${escapeHtml(r.category)}${r.edited_at ? " · 수정됨" : ""}</div>
+      </div>
+      ${locked
+        ? `<span class="muted" style="font-size:12px;">정산완료</span>`
+        : `<button class="ghost" onclick="openEdit('${r.id}')">수정</button><button class="del" onclick="deleteMine('${r.id}')">삭제</button>`}
+    </div>`;
+  }).join("");
+}
+
+let editingId = null;
+async function openEdit(id) {
+  const { data } = await sb.from("receipts").select("*").eq("id", id).single();
+  if (!data) return;
+  editingId = id;
+  document.getElementById("eDate").value = data.receipt_date;
+  document.getElementById("eAmount").value = data.amount;
+  document.getElementById("eDesc").value = data.description;
+  document.getElementById("eCategory").value = data.category;
+  document.getElementById("editMsg").innerHTML = "";
+  document.getElementById("editModal").classList.remove("hidden");
+}
+function closeEdit() { editingId = null; document.getElementById("editModal").classList.add("hidden"); }
+
+async function saveEdit() {
+  const msg = document.getElementById("editMsg");
+  const { data: current } = await sb.from("receipts").select("status").eq("id", editingId).single();
+  if (current && current.status === "정산완료") {
+    msg.innerHTML = `<div class="msg err">이미 정산완료된 항목은 수정할 수 없습니다. 총무에게 문의하세요.</div>`;
+    return;
+  }
+  const { error } = await sb.from("receipts").update({
+    receipt_date: document.getElementById("eDate").value,
+    amount: Number(document.getElementById("eAmount").value),
+    description: document.getElementById("eDesc").value.trim(),
+    category: document.getElementById("eCategory").value.trim(),
+    edited_at: new Date().toISOString()
+  }).eq("id", editingId);
+  if (error) { msg.innerHTML = `<div class="msg err">${escapeHtml(error.message)}</div>`; return; }
+  closeEdit();
+  await loadMyReceipts();
+}
+
+async function deleteMine(id) {
+  const { data: current } = await sb.from("receipts").select("status").eq("id", id).single();
+  if (current && current.status === "정산완료") { alert("정산완료된 항목은 삭제할 수 없습니다. 총무에게 문의하세요."); return; }
+  if (!confirm("이 내역을 삭제할까요?")) return;
+  await sb.from("receipts").delete().eq("id", id);
+  await loadMyReceipts();
+}
+
+// ---------- 영수증 제출 ----------
+async function submitReceipt() {
+  const msg = document.getElementById("submitMsg");
+  const date = document.getElementById("fDate").value;
+  const amount = document.getElementById("fAmount").value;
+  const desc = document.getElementById("fDesc").value.trim();
+  const catSel = document.getElementById("fCategory").value;
+  const catOther = document.getElementById("fCategoryOther").value.trim();
+  const file = document.getElementById("fReceipt").files[0];
+  const category = catSel === "__other__" ? catOther : catSel;
+  const attested = document.getElementById("fAttest").checked;
+
+  if (!date || !amount || !desc || !category || !file) {
+    msg.innerHTML = `<div class="msg err">모든 항목(*)을 입력해주세요.</div>`;
+    return;
+  }
+  if (!attested) {
+    msg.innerHTML = `<div class="msg err">금액·서명이 선명한 사진인지 확인 체크박스를 눌러주세요.</div>`;
+    return;
+  }
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true; btn.textContent = "제출 중...";
+
+  try {
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_"); // 한글/공백 등은 Storage 키로 못 쓰므로 치환
+    const path = `${currentMember.id}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await sb.storage.from("receipts").upload(path, file);
+    if (upErr) throw upErr;
+    const { data: pub } = sb.storage.from("receipts").getPublicUrl(path);
+
+    const { error: insErr } = await sb.from("receipts").insert({
+      receipt_date: date,
+      amount: Number(amount),
+      description: desc,
+      member_id: currentMember.id,
+      member_name: currentMember.name,
+      category,
+      image_url: pub.publicUrl,
+      status: "미확인"
+    });
+    if (insErr) throw insErr;
+
+    msg.innerHTML = `<div class="msg ok">제출 완료했습니다. 실물 영수증도 창고함에 넣어주세요.</div>`;
+    document.getElementById("fAmount").value = "";
+    document.getElementById("fDesc").value = "";
+    document.getElementById("fCategory").value = "";
+    document.getElementById("fCategoryOther").value = "";
+    document.getElementById("fCategoryOtherWrap").classList.add("hidden");
+    document.getElementById("fReceipt").value = "";
+    document.getElementById("fAttest").checked = false;
+    document.getElementById("fDate").valueAsDate = new Date();
+    await loadMyReceipts();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg err">제출 중 오류: ${escapeHtml(e.message || String(e))}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "제출";
+  }
+}
+
+// ---------- 관리자 ----------
+let isAdmin = false;
+let allReceipts = [];
+
+function adminLogin() {
+  const pin = document.getElementById("adminPin").value;
+  const msg = document.getElementById("adminLoginMsg");
+  if (pin !== ADMIN_PASSWORD) {
+    msg.innerHTML = `<div class="msg err">비밀번호가 일치하지 않습니다.</div>`;
+    return;
+  }
+  isAdmin = true;
+  document.getElementById("adminLoginCard").classList.add("hidden");
+  document.getElementById("adminBody").classList.remove("hidden");
+  refreshAdmin();
+}
+
+async function refreshAdmin() {
+  await Promise.all([loadReceiptsAdmin(), renderMemberManage(), renderCategoryManage()]);
+  populateAdminFilters();
+}
+
+async function loadReceiptsAdmin() {
+  const { data, error } = await sb.from("receipts").select("*").order("receipt_date", { ascending: false });
+  allReceipts = error ? [] : data;
+  renderReceiptList();
+}
+
+function populateAdminFilters() {
+  // 이름/구분 필터는 실제 제출 내역이 아니라 회원·카테고리 등록 목록 전체에서 가져옴
+  // (아직 제출된 내역이 없어도 전체 회원/카테고리가 바로 보이도록)
+  const nameSel = document.getElementById("filterName");
+  const prevName = nameSel.value;
+  nameSel.innerHTML = `<option value="">전체 이름</option>` + members.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join("");
+  nameSel.value = prevName;
+
+  const catSel = document.getElementById("filterCategory");
+  const prevCat = catSel.value;
+  catSel.innerHTML = `<option value="">전체 구분</option>` + categories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("");
+  catSel.value = prevCat;
+
+  nameSel.onchange = renderReceiptList;
+  catSel.onchange = renderReceiptList;
+}
+
+function clearDateFilter() {
+  document.getElementById("filterFrom").value = "";
+  document.getElementById("filterTo").value = "";
+  renderReceiptList();
+}
+
+function getFilteredReceipts() {
+  const nameF = document.getElementById("filterName").value;
+  const catF = document.getElementById("filterCategory").value;
+  const fromF = document.getElementById("filterFrom").value;
+  const toF = document.getElementById("filterTo").value;
+  return allReceipts.filter(r =>
+    (!nameF || r.member_name === nameF) &&
+    (!catF || r.category === catF) &&
+    (!fromF || r.receipt_date >= fromF) &&
+    (!toF || r.receipt_date <= toF)
+  );
+}
+
+function renderReceiptList() {
+  const filtered = getFilteredReceipts();
+  const list = document.getElementById("receiptList");
+  if (!filtered.length) {
+    list.innerHTML = `<p class="muted">해당하는 제출 내역이 없습니다.</p>`;
+    return;
+  }
+  list.innerHTML = filtered.map(r => {
+    const badgeClass = r.status === "정산완료" ? "done" : r.status === "확인됨" ? "checked" : "pending";
+    return `
+    <div class="list-item">
+      <img class="thumb" src="${r.image_url}" alt="영수증" onclick="window.open('${r.image_url}','_blank')">
+      <div class="info">
+        <div class="top">${escapeHtml(r.description)} <span class="amount">¥${Number(r.amount).toLocaleString()}</span> <span class="badge ${badgeClass}">${r.status}</span></div>
+        <div class="sub">${r.receipt_date} · ${escapeHtml(r.member_name)} · ${escapeHtml(r.category)}${r.edited_at ? " · 수정됨" : ""}</div>
+      </div>
+      <select class="status-select" onchange="setStatus('${r.id}', this.value)">
+        <option value="미확인" ${r.status === "미확인" ? "selected" : ""}>미확인</option>
+        <option value="확인됨" ${r.status === "확인됨" ? "selected" : ""}>확인됨</option>
+        <option value="정산완료" ${r.status === "정산완료" ? "selected" : ""}>정산완료</option>
+      </select>
+    </div>`;
+  }).join("");
+}
+
+async function setStatus(id, status) {
+  await sb.from("receipts").update({ status }).eq("id", id);
+  await loadReceiptsAdmin();
+}
+
+function exportCsv() {
+  const rows = [["날짜","금액","내용","이름","구분","상태","영수증URL"]];
+  getFilteredReceipts().forEach(r => rows.push([r.receipt_date, r.amount, r.description, r.member_name, r.category, r.status, r.image_url]));
+  const csv = rows.map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `rcs-receipts-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+async function renderMemberManage() {
+  const { data } = await sb.from("members").select("*").eq("active", true).order("name");
+  members = data || [];
+  document.getElementById("memberList").innerHTML = members.map(m => `
+    <li>${escapeHtml(m.name)} <span class="muted">(${escapeHtml(m.pin)})</span>
+      <span class="btns">
+        <button class="ghost" onclick="editMember('${m.id}')">수정</button>
+        <button class="del" onclick="removeMember('${m.id}')">삭제</button>
+      </span>
+    </li>
+  `).join("") || `<li class="muted">등록된 회원이 없습니다.</li>`;
+}
+
+async function editMember(id) {
+  const m = members.find(x => x.id === id);
+  if (!m) return;
+  const name = prompt("이름", m.name);
+  if (name === null || !name.trim()) return;
+  const pin = prompt("PIN", m.pin);
+  if (pin === null || !pin.trim()) return;
+  await sb.from("members").update({ name: name.trim(), pin: pin.trim() }).eq("id", id);
+  await renderMemberManage();
+  populateAdminFilters();
+  await loadMembers();
+}
+
+async function addMember() {
+  const name = document.getElementById("newMemberName").value.trim();
+  const pin = document.getElementById("newMemberPin").value.trim();
+  if (!name || !pin) return;
+  await sb.from("members").insert({ name, pin, active: true });
+  document.getElementById("newMemberName").value = "";
+  document.getElementById("newMemberPin").value = "";
+  await renderMemberManage();
+  populateAdminFilters();
+  await loadMembers();
+}
+
+async function removeMember(id) {
+  await sb.from("members").update({ active: false }).eq("id", id);
+  await renderMemberManage();
+  populateAdminFilters();
+  await loadMembers();
+}
+
+async function renderCategoryManage() {
+  const { data } = await sb.from("categories").select("*").eq("active", true).order("name");
+  categories = data || [];
+  document.getElementById("categoryList").innerHTML = categories.map(c => `
+    <li>${escapeHtml(c.name)}
+      <span class="btns">
+        <button class="ghost" onclick="editCategory('${c.id}')">수정</button>
+        <button class="del" onclick="removeCategory('${c.id}')">삭제</button>
+      </span>
+    </li>
+  `).join("") || `<li class="muted">등록된 구분이 없습니다.</li>`;
+}
+
+async function editCategory(id) {
+  const c = categories.find(x => x.id === id);
+  if (!c) return;
+  const name = prompt("카테고리명", c.name);
+  if (name === null || !name.trim()) return;
+  await sb.from("categories").update({ name: name.trim() }).eq("id", id);
+  await renderCategoryManage();
+  populateAdminFilters();
+  await loadCategories();
+}
+
+async function addCategory() {
+  const name = document.getElementById("newCategoryName").value.trim();
+  if (!name) return;
+  await sb.from("categories").insert({ name, active: true });
+  document.getElementById("newCategoryName").value = "";
+  await renderCategoryManage();
+  populateAdminFilters();
+  await loadCategories();
+}
+
+async function removeCategory(id) {
+  await sb.from("categories").update({ active: false }).eq("id", id);
+  await renderCategoryManage();
+  populateAdminFilters();
+  await loadCategories();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+</script>
+</body>
+</html>
